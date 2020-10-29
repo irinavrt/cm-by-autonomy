@@ -1,0 +1,111 @@
+evs_name,code,geo,region,sub_region
+Albania,ALB,AL,Europe,Southern Europe
+Algeria,DZA,DZ,Africa,Northern Africa
+Andorra,AND,AD,Europe,Southern Europe
+Argentina,ARG,AR,Americas,Latin America and the Caribbean
+Armenia,ARM,AM,Asia,Western Asia
+Australia,AUS,AU,Oceania,Australia and New Zealand
+Austria,AUT,AT,Europe,Western Europe
+Azerbaijan,AZE,AZ,Asia,Western Asia
+Bangladesh,BGD,BD,Asia,Southern Asia
+Belarus,BLR,BY,Europe,Eastern Europe
+Belgium,BEL,BE,Europe,Western Europe
+Bosnia,BIH,BA,Europe,Southern Europe
+Brazil,BRA,BR,Americas,Latin America and the Caribbean
+Bulgaria,BGR,BG,Europe,Eastern Europe
+Burkina Faso,BFA,BF,Africa,Sub-Saharan Africa
+Canada,CAN,CA,Americas,Northern America
+Chile,CHL,CL,Americas,Latin America and the Caribbean
+China,CHN,CN,Asia,Eastern Asia
+Colombia,COL,CO,Americas,Latin America and the Caribbean
+Croatia,HRV,HR,Europe,Southern Europe
+Cyprus,CYP,CY,Asia,Western Asia
+Cyprus (T),NA,NA,NA,NA
+Czech Republic,CZE,CZ,Europe,Eastern Europe
+Denmark,DNK,DK,Europe,Northern Europe
+Dominican Rep.,DOM,DO,Americas,Latin America and the Caribbean
+Ecuador,ECU,EC,Americas,Latin America and the Caribbean
+Egypt,EGY,EG,Africa,Northern Africa
+El Salvador,SLV,SV,Americas,Latin America and the Caribbean
+Estonia,EST,EE,Europe,Northern Europe
+Ethiopia,ETH,ET,Africa,Sub-Saharan Africa
+Finland,FIN,FI,Europe,Northern Europe
+France,FRA,FR,Europe,Western Europe
+Georgia,GEO,GE,Asia,Western Asia
+Germany,DEU,DE,Europe,Western Europe
+Ghana,GHA,GH,Africa,Sub-Saharan Africa
+Great Britain,GBR,GB,Europe,Northern Europe
+Greece,GRC,GR,Europe,Southern Europe
+Guatemala,GTM,GT,Americas,Latin America and the Caribbean
+Hong Kong,HKG,HK,Asia,Eastern Asia
+Hungary,HUN,HU,Europe,Eastern Europe
+Iceland,ISL,IS,Europe,Northern Europe
+India,IND,IN,Asia,Southern Asia
+Indonesia,IDN,ID,Asia,South-eastern Asia
+Iran,IRN,IR,Asia,Southern Asia
+Iraq,IRQ,IQ,Asia,Western Asia
+Ireland,IRL,IE,Europe,Northern Europe
+Israel,ISR,IL,Asia,Western Asia
+Italy,ITA,IT,Europe,Southern Europe
+Japan,JPN,JP,Asia,Eastern Asia
+Jordan,JOR,JO,Asia,Western Asia
+Kazakhstan,KAZ,KZ,Asia,Central Asia
+Kosovo,XKX,NA,NA,NA
+Kuwait,KWT,KW,Asia,Western Asia
+Kyrgyzstan,KGZ,KG,Asia,Central Asia
+Latvia,LVA,LV,Europe,Northern Europe
+Lebanon,LBN,LB,Asia,Western Asia
+Libya,LBY,LY,Africa,Northern Africa
+Lithuania,LTU,LT,Europe,Northern Europe
+Luxembourg,LUX,LU,Europe,Western Europe
+Macedonia,MKD,MK,Europe,Southern Europe
+Malaysia,MYS,MY,Asia,South-eastern Asia
+Mali,MLI,ML,Africa,Sub-Saharan Africa
+Malta,MLT,MT,Europe,Southern Europe
+Mexico,MEX,MX,Americas,Latin America and the Caribbean
+Moldova,MDA,MD,Europe,Eastern Europe
+Montenegro,MNE,ME,Europe,Southern Europe
+Morocco,MAR,MA,Africa,Northern Africa
+Netherlands,NLD,NL,Europe,Western Europe
+New Zealand,NZL,NZ,Oceania,Australia and New Zealand
+Nigeria,NGA,NG,Africa,Sub-Saharan Africa
+Northern Ireland,GBR,GB,Europe,Northern Europe
+Norway,NOR,NO,Europe,Northern Europe
+Pakistan,PAK,PK,Asia,Southern Asia
+Palestine,PSE,PS,Asia,Western Asia
+Peru,PER,PE,Americas,Latin America and the Caribbean
+Philippines,PHL,PH,Asia,South-eastern Asia
+Poland,POL,PL,Europe,Eastern Europe
+Portugal,PRT,PT,Europe,Southern Europe
+Puerto Rico,PRI,PR,Americas,Latin America and the Caribbean
+Qatar,QAT,QA,Asia,Western Asia
+Romania,ROU,RO,Europe,Eastern Europe
+Russian Federation,RUS,RU,Europe,Eastern Europe
+Rwanda,RWA,RW,Africa,Sub-Saharan Africa
+Saudi Arabia,SAU,SA,Asia,Western Asia
+Serbia,SRB,RS,Europe,Southern Europe
+Serbia and Montenegro,SCG,NA,NA,NA
+Singapore,SGP,SG,Asia,South-eastern Asia
+Slovakia,SVK,SK,Europe,Eastern Europe
+Slovenia,SVN,SI,Europe,Southern Europe
+South Africa,ZAF,ZA,Africa,Sub-Saharan Africa
+South Korea,KOR,KR,Asia,Eastern Asia
+Spain,ESP,ES,Europe,Southern Europe
+Sweden,SWE,SE,Europe,Northern Europe
+Switzerland,CHE,CH,Europe,Western Europe
+Taiwan,TWN,TW,Asia,Eastern Asia
+Tanzania,TZA,TZ,Africa,Sub-Saharan Africa
+Thailand,THA,TH,Asia,South-eastern Asia
+Trinidad and Tobago,TTO,TT,Americas,Latin America and the Caribbean
+Tunisia,TUN,TN,Africa,Northern Africa
+Turkey,TUR,TR,Asia,Western Asia
+Uganda,UGA,UG,Africa,Sub-Saharan Africa
+Ukraine,UKR,UA,Europe,Eastern Europe
+United States,USA,US,Americas,Northern America
+Uruguay,URY,UY,Americas,Latin America and the Caribbean
+Uzbekistan,UZB,UZ,Asia,Central Asia
+Venezuela,VEN,VE,Americas,Latin America and the Caribbean
+Viet Nam,VNM,VN,Asia,South-eastern Asia
+Yemen,YEM,YE,Asia,Western Asia
+Zambia,ZMB,ZM,Africa,Sub-Saharan Africa
+Zimbabwe,ZWE,ZW,Africa,Sub-Saharan Africa

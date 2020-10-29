@@ -1,0 +1,12 @@
+behaviour,bhvr_code,label
+state_benef,f114,Claiming government benefits
+tax_cheat,f116,Cheating on taxes
+cash,f131,Paying cash to avoid taxes
+drugs,f126,Taking soft drugs
+liter,f129,Throwing away litter
+speed,f134,Speeding over the limit
+alc_drive,f130,Driving under influence of alcohol
+casual_sex,f132,Having casual sex
+fare_cheat,f115,Avoiding a fare on public transport
+lie,f127,Lying
+bribe,f117,Someone accepting a bribe
