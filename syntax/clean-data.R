@@ -11,6 +11,7 @@ evs  <- evs_full %>%
          age = X003,
          income = X047,
          edu = X025,
+         relig = A006,
          just.state_benef = F114,
          just.tax_cheat = F116,
          just.cash = F131,
@@ -41,8 +42,10 @@ evs <- evs %>%
   mutate_at(vars(cntry, sex), as_factor) %>% 
   zap_labels() %>% 
   mutate(cntry = as.character(cntry),
-         autonomy = A029 + A039 - A042 - A040, 
-         aut_short = (A029 + (1-A042))/2,
+         # independence = A029,
+         # obedience = A042,
+         # reverse religiosity item
+         relig = 5 - relig,
          edu = cut(edu, 
                    c(0, 3, 6, 8), 
                    labels = c("low", "middle", "high"))) %>% 
@@ -52,13 +55,13 @@ evs <- evs %>%
 
 evs <- evs %>% 
   # Exclude those who did not respect the requirement of no more that 5 child qualities
-  mutate(total = rowSums(dplyr::select(., starts_with("A0")), na.rm = TRUE)) %>% 
-  filter(total > 0, total <= 5) %>% 
-  select(-A027,-A028, -A030:-A038, -A041, -total) %>% 
-  drop_na(sex, age, edu, autonomy)
+  mutate(total = rowSums(dplyr::select(., starts_with("A0")), na.rm = TRUE)) %>%
+#  filter(total > 0, total <= 5) %>%
+#  select(-A027,-A028, -A030:-A038, -A041, -total) %>%
+  drop_na(sex, age, edu, relig)
 
 
-# Reshape behaviours into long format.
+# Reshape behaviors into long format.
 evs_long <- evs %>% 
   mutate(id = rownames(.)) %>% 
   gather(var, value, starts_with("just"), starts_with("common")) %>% 
@@ -66,31 +69,4 @@ evs_long <- evs %>%
   spread(type, value) %>% 
   drop_na(just, common) 
 
-
-# Country level data ----------------------------------------------------------------
-
-# Country level autonomy
-evs_long <- evs_long %>% 
-  group_by(cntry) %>% 
-  mutate(autonomy_cntry = weighted.mean(autonomy, wgt, na.rm = TRUE),
-         aut_sh_cntry = weighted.mean(aut_short, wgt, na.rm = TRUE)) %>% 
-  ungroup()
-
-# Add country codes to merge HDI data
-cntry_codes <- read_csv("data/cntry-codes.csv")
-evs_long <- left_join(evs_long, cntry_codes %>% select(cntry = evs_name, code)) 
-
-
-# HDI
-hdi <- read_csv("data/GDL-Indices-(1999)-data.csv")
-
-evs_long <- left_join(evs_long, 
-                 hdi %>% 
-                   select(code = ISO_Code,
-                          hdi_gni = `Income index`,
-                          hdi_edu = `Educational index`,
-                          hdi_health = `Health index`))
-
-
-
-write_rds(evs_long, "data/evs-clean.rds")
+write_rds(evs_long, "data/evs-clean-with-Cr.rds")
