@@ -2,5 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+.gitignore
+syntax/models_stan.R
 ZA4804_v3-1-0.sav
+mixed-2l-models.rds
+mixed-3l-models.rds
+stan-models.rds
 mixed-models.rds
