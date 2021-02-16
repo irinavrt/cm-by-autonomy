@@ -1,14 +1,16 @@
 ---
 title: "Manuscript results"
-output: 
+output:
   html_document:
-    keep_md: TRUE
+    keep_md: yes
 ---
 
 
 ```{r setup, include = FALSE}
 
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      out.width = "60%", fig.align = 'center',
+                      dpi = 300, dev="jpeg", tidy = TRUE)
 
 library(knitr)
 library(tidyverse, quietly = TRUE)
@@ -17,7 +19,7 @@ library(broom.mixed)
 library(modelsummary)
 library(ggthemes)
 library(mgcv)
-library(lavaan)
+library(cowplot)
 
 theme_set(theme_classic(base_size = 14))
 
@@ -27,11 +29,12 @@ theme_set(theme_classic(base_size = 14))
 ```{r data}
 
 evs <- read_rds("../data/evs-clean.rds")
+
 behavrs_labels <- read_csv("../data/behavior-labels.csv")
-autonomy_global <- read_rds("../data/mean-autonomy-by-cntry-year.rds")
 
 # Load mixed effect models estimated in models.R
-mixed_models <- read_rds("../data/mixed-models.rds")
+mixed_3l <- read_rds("../data/mixed-3l-models.rds")
+mixed_2l <- read_rds("../data/mixed-2l-models.rds")
 
 
 ```
@@ -43,20 +46,20 @@ mixed_models <- read_rds("../data/mixed-models.rds")
 sample <- evs %>% 
   select(cntry, id, sex, age) %>% 
   distinct() %>% 
-  summarise(n = n(), n_cntry = n_distinct(cntry), female = mean(sex == "Female"), mean_age = mean(age), sd_age = sd(age))
-
-
+  summarise(n = n(), 
+            n_cntry = n_distinct(cntry), 
+            female = mean(sex == "Female"), 
+            mean_age = mean(age), 
+            sd_age = sd(age))
+sample
 ```
 
 
 We use data on `r sample$n` participants from `r sample$n_cntry` countries in the 1999 wave of the European Values Study, `r sprintf("%.0f", sample$female*100)`% women, mean age `r sprintf("%.1f", sample$mean_age)` with SD `r sprintf("%.1f", sample$sd_age)`.
 
 
-
 ## Results
 
-
-*Table 1:* Descriptive statistics for perceptions of how common and how moral eight questionable behaviors are, including the correlation (the common-is-moral association).
 
 ```{r tbl1}
 
@@ -84,25 +87,128 @@ behavrs_summary %>%
                       "Common M (SD)", 
                       "Moral M (SD)",
                       "Pearson correlation"), 
-        caption = "Table 1: Descriptive statistics for perceptions of how common and how moral eight questionable behaviors are, and the common-is-moral association.",
-        notes = "Note: Based on more than 35,000 respondents in 30 countries in the 1999 wave of the European Values Study. The common-is-moral association is calculated as the Pearson correlation between the two ratings. 95% confidence intervals in brackets.")
+        caption = "Table 1. Descriptive statistics for perceptions of how common and how moral eight questionable behaviors are, including the correlation (the common-is-moral association).",
+        notes = "Note: Based on more than 35,000 respondents in 31 countries in the 1999 wave of the European Values Study. The common-is-moral association is calculated as the Pearson correlation between the two ratings. 95% confidence intervals in brackets.")
   
 
 ```
 
-### Near universality of the common-is-moral association
+```{r}
 
-```{r fig1, fig.width=8, fig.height=5.3, fig.cap="Figure 1. Boxplots showing how the common-is-moral association for eight questionable behaviors varied across 30 countries in the European Values Study. Boxes indicate the interquartile range, with the dark line in the box indicating the median. Below each box, the exact distribution is represented by dots."}
+evs %>% 
+  group_by(behaviour) %>% 
+  summarise(r = cor(common, just, use = "pair"),
+            just = weighted.mean(just, wgt, na.rm = TRUE)) %>% 
+  summarise(min(r), max(r), mean(r), cor(r, just))
+
+```
+
+### The within-individual common-is-moral association is typically positive
+
+
+```{r}
+
+ind_cor <- evs %>% 
+  group_by(cntry, id, relig) %>% 
+  summarise(r = cor(common, just), 
+            sd_j = sd(just),
+            sd_c = sd(common),
+            mean_j = mean(just),
+            mean_c = mean(common),
+            n = n(), 
+            .groups = "drop") %>% 
+  filter(n > 6) %>% 
+  drop_na(r)
+
+ind_cor %>% 
+  summarise(mean(r>0), mean(r), sd(r)) %>% 
+  kable(digits = 2)
+
+```
+
+
+```{r fig1, fig.asp=1/3, fig.cap = "Figure 1. Plot showing the average within-individual common-is-moral association in 31 countries in the European Values Study. Each dot represents a country. The box indicates the interquartile range, with the dark line in the box indicating the median."}
+
+cntr_mean_within <- ind_cor %>% 
+ group_by(cntry) %>% 
+ summarise(mean_r = mean(r, na.rm = TRUE)) 
+
+cntr_mean_within %>% 
+  ggplot(aes("Country average", mean_r)) +
+  geom_crossbar(stat = "summary", fun.data = "my_summary", width = .4, position = position_nudge(x = .2))+
+  gghalves::geom_half_point(side = "l", alpha = .5, transformation = position_identity(), size = 2) +
+  geom_hline(yintercept = 0, color = "grey50") +
+  labs(x = NULL, y =  "Common-is-moral association") +
+  coord_flip() 
+
+```
+
+
+### The within-individual common-is-moral association is weaker among the more religious.
+
+```{r fig2, fig.cap = "Figure 2. The mean withinbetween-individual common-is-moral association (with 95% bootstrap confidence interval) in each of four subsamples defined by religiosity."}
+
+ind_cor %>% 
+  ggplot(aes(relig, r)) +
+  stat_summary(fun.data = "mean_cl_boot") +
+  labs(x = "Religiosity", 
+       y = "Common-is-moral association")
+
+```
+
+
+```{r fig3, fig.asp = .5, fig.cap = "Figure 3. Fixed effect estimates, with 95% confidence intervals, from the three-level model of moral judgments with Co centered at the individual mean and the rest of the predictors centered at the country means."}
+
+coef_map <- c(
+  "common_i" = "Co", 
+  "relig" = "Relig",
+  "common_i:relig" = "Co x Relig",
+  "female" = "Female",
+  "age" = "Age",
+  "edu_mid" = "Education: Secondary",
+  "edu_high" = "Education: Tertiary"
+)
+
+modelplot(mixed_3l[[1]], coef_map = coef_map, draw = TRUE) +
+  geom_vline(xintercept = 0, color = "grey50") +
+  theme_classic(base_size = 14) +
+  labs(x = NULL)
+
+# ggsave("3-level-mod-estimates.jpeg", width = 7, height = 3.5, dpi = 300)
+
+```
+
+
+
+### The between-individual common-is-moral association is typically positive
+
+```{r}
 
 cm_by_bhvr <- evs %>%
-  group_by(cntry, behaviour, autonomy_cntry) %>%
+  group_by(cntry) %>% 
+  mutate(relig_cntry = mean(relig, na.rm =TRUE)) %>% 
+  group_by(cntry, behaviour, relig_cntry) %>%
   summarise(cm = cor(common, just),
-            n = n()) %>% 
+            n = n(), 
+            se = sqrt((1 - cm^2)/(n - 2)),
+            z = cm/se) %>% 
   ungroup()
 
 
 cm_by_bhvr <- cm_by_bhvr %>% 
   left_join(behavrs_labels) 
+
+cm_by_bhvr %>% 
+  group_by(behaviour) %>% 
+  summarise(positive = mean(cm > 0)) %>% 
+  arrange(positive) %>% 
+  mutate(mean(positive))
+
+```
+
+
+```{r fig4, fig.cap="Figure 4. Boxplots showing how the common-is-moral association for eight questionable behaviors varied across 31 countries in the European Values Study. Boxes indicate the interquartile range, with the dark line in the box indicating the median. Below each box, the exact distribution is represented by dots."}
+
 
 my_summary <- function(variable) {
   tibble(y = median(variable),
@@ -113,280 +219,269 @@ my_summary <- function(variable) {
 cm_by_bhvr %>%  
   mutate(label = fct_rev(label))%>% 
   ggplot(aes(label, cm)) +
-  geom_crossbar(stat = "summary", fun.data = "my_summary", width = .4, position = position_nudge(x = .2))+
-  gghalves::geom_half_point(side = "l", alpha = .5, transformation = position_identity(), size = 2) +
+  geom_crossbar(stat = "summary", fun.data = "my_summary", 
+                width = .4, position = position_nudge(x = .2))+
+  gghalves::geom_half_point(side = "l", alpha = .5, 
+                            transformation = position_identity(), 
+                            size = 2) +
   geom_hline(yintercept = 0, color = "grey50") +
   labs(x = NULL, y =  "Common-is-moral association") +
-  coord_flip() 
+  coord_flip(ylim = c(min(cm_by_bhvr$cm), max(cm_by_bhvr$cm))) 
 
-# ggsave("cm-boxplot.jpeg", width = 8, height = 5.3, dpi = 350)
+# ggsave("cm-boxplot.jpeg", width = 8, height = 4.5, dpi = 350)
 
 ```
 
-
-
-### The common-is-moral association is stronger in countries where the autonomy index is higher
+### The between-individual common-is-moral association is weaker among more religious people
 
 ```{r}
 
-aut_effect <- cm_by_bhvr %>% 
-  group_by(behaviour) %>% 
-  nest() %>% 
-  mutate(mod = map(data, ~lm(cm ~ autonomy_cntry, .x)),
-         map_dfc(mod, ~tidy(.x, conf.int = TRUE) %>% filter(term == "autonomy_cntry")),
-         r.sq = map_dbl(mod, ~glance(.x)$r.squared[1])) %>% 
-  ungroup()
-
-aut_effect_min <- aut_effect %>% 
-  arrange(estimate) %>% 
-  slice(1)
-
-aut_effect_max <- aut_effect %>% 
-  arrange(desc(estimate)) %>% 
-  slice(1)
-
-
-```
-
-
-By averaging the autonomy index over all respondents in a country we obtained a country-level autonomy index, ranging from `r sprintf("%.2f", min(cm_by_bhvr$autonomy_cntry))` (Turkey) to `r sprintf("%.2f", max(cm_by_bhvr$autonomy_cntry))` (Germany). Next we examined whether the country variation in the common-is-moral association is accounted for by variation in the country-level autonomy index. Figure 2 presents eight scatter plots, one for each questionable behavior, all showing a stronger common-is-moral association in countries with higher autonomy index. Regression line slopes ranged from B = `r sprintf("%.2f, 95%% CI [%.2f, %.2f]", aut_effect_min$estimate, aut_effect_min$conf.low, aut_effect_min$conf.high)` to `r sprintf("%.2f, 95%% CI [%.2f, %.2f]", aut_effect_max$estimate, aut_effect_max$conf.low, aut_effect_max$conf.high)`. The proportion of variance explained ranged from R2 = `r sprintf("%.2f", aut_effect_min$r.sq)` to  R2 = `r sprintf("%.2f", aut_effect_max$r.sq)`.
-
-
-```{r fig2, fig.width = 8, fig.height = 5.3,  fig.cap = "Figure 2. Scatter plots with best-fitting regression lines (with shadings indicating 95% confidence intervals for the slope) showing how the common-is-moral association for eight questionable behaviors covaried with the autonomy index across 30 countries in the European Values Study."}
-
-
-rsq <- cm_by_bhvr %>% 
-  mutate(label = fct_recode(label, 
-                            "Driving under influence" = "Driving under influence of alcohol")) %>%   
-  group_by(label) %>% 
-  summarise(rsq = cor(autonomy_cntry, cm)^2,
-            rsq = sprintf("R^2 == %.2f", rsq))
-
-cm_by_bhvr %>% 
-  mutate(label = fct_recode(label, 
-                            "Driving under influence" = "Driving under influence of alcohol")) %>%
-  ggplot(aes(autonomy_cntry, cm)) +
-  geom_point(alpha = .5) +
-  geom_smooth(method = "lm", color = "grey20") +
-  geom_text(data = rsq, aes(label = rsq), x = -0.58, y = .35, hjust = 0,
-             parse = TRUE, size = 3.5) +
-  facet_wrap(~label, nrow = 2) +
-  theme_classic() +
-  labs(x = "Autonomy index", y = "Common-is-moral association")
-
-#ggsave("cm-vs-aut-scatter.jpeg", width = 8, height = 5.3, dpi = 350)
-
-```
-
-
-### Within countries, the common-is-moral association is stronger among people with higher autonomy index
-
-
-```{r}
-
-cm_by_bhvr_aut <- evs %>%
-  drop_na(common, just, autonomy) %>% 
-  group_by(cntry, behaviour, autonomy) %>%
+cm_by_bhvr_relig <- evs %>%
+  drop_na(common, just, relig) %>% 
+  group_by(cntry, behaviour, relig) %>%
   summarise(cm = cor(common, just),
             n = n()) %>% 
   ungroup()
 
-est_alpha <- cm_by_bhvr_aut %>%
+est_alpha <- cm_by_bhvr_relig %>%
   ungroup() %>% 
   select(-n) %>% 
   pivot_wider(names_from = behaviour, values_from = cm) %>% 
-  select(-cntry, -autonomy) %>% 
+  select(-cntry, -relig) %>% 
   psych::alpha() %>% 
   .[["total"]] %>% 
   pull(raw_alpha) %>% 
   round(2)
 
-
-
 ```
 
 
 
-```{r fig3, fig.width=5, fig.height=5, fig.cap = "Figure 3. The estimated increase in the common-is-moral association associated with an increase of the autonomy index by 1 within each of 30 countries."}
+```{r fig5,  fig.cap = "Figure 5. The between-individual common-is-moral association for each of eight behaviors in each of four subsamples defined by religiosity, averaged across countries. With 95% bootstrap CI."}
 
+cm_by_bhvr_relig %>% 
+  left_join(behavrs_labels) %>% 
+  mutate(pl_label = fct_recode(label, 
+                            "Driving under influence" = "Driving under influence of alcohol")) %>% 
+  ggplot(aes(relig, cm)) +
+  stat_summary(fun.data = "mean_cl_boot") +
+  facet_wrap(~pl_label, nrow = 2) + 
+  geom_hline(yintercept = 0, color = "grey30") +
+  labs(x = "Religiosity", y = "Common-is-moral association") + 
+  theme_classic() 
+#  theme(panel.grid.major = element_line()) 
 
-withint_aut_eff <- cm_by_bhvr_aut %>% 
-  group_by(cntry) %>% 
-  nest() %>% 
-  mutate(mod = map(data, ~lm(cm ~ autonomy, .x)),
-         map_dfc(mod, ~tidy(.x, conf.int = TRUE) %>% filter(term == "autonomy")),
-         r.sq = map_dbl(mod, ~glance(.x)$r.squared[1])) %>% 
-  ungroup() 
-
-
-mean_eff <- withint_aut_eff %>% 
-  summarise(mean_se(estimate, mult = 1.96))
-
-
-withint_aut_eff %>% 
-  ggplot(aes(fct_reorder(cntry, estimate), estimate, ymin = conf.low, ymax = conf.high)) +
-  geom_pointrange() +
-  geom_hline(yintercept = 0, color = "grey50") +
-  labs(x = NULL, y = "Coefficient estimate") +
-  coord_flip() 
-
-
-#ggsave("cm-vs-aut-by-cntry.jpeg", width = 5, height = 5, dpi = 350)
-
+#ggsave("cm-by-relig.jpeg", width = 8, height = 5.3, dpi = 350)
+  
 ```
 
 
-## Mixed-effects models
 
-
-```{r fig4, fig.width = 8, fig.height = 6, fig.cap = "Figure 4. Fixed effect estimates of the mixed effect model with 95% confidence intervals."}
+```{r fig6, fig.asp = 0.5, fig.cap = "Figure 6. Fixed effect estimates, with 95% confidence intervals, of the common-is-moral association (Co) and its moderation by religiosity (Co x Relig) using mixed-effect model M1. All predictors are centered at the country mean."}
 
 coef_map <- c(
   "common" = "Co", 
-  "autonomy" = "Au_ind",
-  "common:autonomy" = "Co x Au_ind",
-  "autonomy_cntry" = "Au_cnt",
-  "common:autonomy_cntry" = "Co x Au_cnt",
-  "hdi_edu" = "HDI, Education", 
-  "hdi_gni" = "HDI, Income",
-  "hdi_le" = "HDI, Health",
-  "common:hdi_edu" = "Co x HDI, Education", 
-  "common:hdi_gni" = "Co x HDI, Income",
-  "common:hdi_le" = "Co x HDI, Health",
-  "sexFemale" = "Female", 
-  "age" = "Age",
-  "edumiddle" = "Education: Secondary", 
-  "eduhigh" = "Education: Tertiary"
+  "common:relig" = "Co x Relig"
 )
 
-modelplot(mixed_models$reml[[1]], coef_map = coef_map) +
-  geom_vline(xintercept = 0, color = "grey50") +
-  theme(legend.position = "bottom") +
-  theme_classic(base_size = 14)
+m2l_esimates <- modelplot(set_names(mixed_2l$mod,
+                    mixed_2l$behaviour),
+          coef_map = rev(coef_map), draw = FALSE) %>% 
+  mutate(m = "Base") %>% 
+ left_join(behavrs_labels, by = c("model" = "behaviour")) 
 
-# ggsave("mixed_model_coef.jpeg", width = 8, height = 6, dpi = 350)
+panel_lim <- tibble(term = c("Co", "Co", "Co x Relig", "Co x Relig"),
+                    estimate = c(-1, 1, -0.3, 0.3)) %>% 
+  left_join(m2l_esimates %>% select(term, label))
+
+m2l_esimates %>% 
+  ggplot(aes(fct_rev(label), estimate)) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high),
+                  position = position_dodge(width = .6)) +
+  scale_color_grey()+
+  coord_flip() +
+  geom_hline(yintercept = 0, color = "grey50") +
+  # theme_classic(base_size = 11) +
+  # theme(panel.grid.major = element_line()) +
+  geom_blank(data = panel_lim) +
+  facet_wrap(~term, nrow = 1, scales = "free_x") +
+  labs(x = NULL, y = NULL)
+
+# ggsave("mod-estimates.jpeg", width = 7, height = 3.5, dpi = 300)
 
 ```
 
-```{r fig5, fig.width = 5, fig.height = 4, fig.cap = "Figure 5. Autonomy values moderate the common-is-moral association. The slope of the blue line (β2 in the model) represents the estimated common-is-moral association among average individuals in the average country. The additional slope of the yellow line  (β4)  represents the increase in the common-is-moral association when estimated among individuals who are one standard deviation higher on the autonomy index. The additional slope of the red line (β6) represents the estimated further increase in the common-is-moral association when also the country is one standard deviation higher on the autonomy index."}
-
+```{r fig7, fig.asp=0.53, fig.cap="Figure 7. Religiosity moderates the common-is-moral association. The slope of the blue line represents the estimated common-is-moral association for an average behavior in the average country among non-religious individuals (1 scale unit lower than the average). The red line has less slope, representing the estimated common-is-moral association for an average behavior in the average country among religious individuals (1 scale unit lower than the average)."}
 
 pred_data <- expand_grid(common = seq(-2, 2, .5),
-                         autonomy = c(0, 1),
-                         autonomy_cntry = c(0, 1),
+                         relig = c(-1, 1),
                          age = 0,
-                         sex = c("Male", "Female"),
-                         edu = c("low", "middle", "high"),
-                         hdi_edu = 0,
-                         hdi_gni = 0,
-                         hdi_le = 0)
+                         female = 0,
+                         edu_mid = 0,
+                         edu_high = 0,
+                         hdi_gni = 0, 
+                         hdi_edu = 0) %>% 
+  mutate(common_i = common)
 
-pred_data$pred <- predict(mixed_models$reml[[1]], pred_data, re.form = ~0)
-
-pred_data <- pred_data %>%
-  group_by(autonomy, autonomy_cntry, common) %>%
+predictions_bw <- mixed_2l %>% 
+  transmute(pr = map(mod, 
+                   ~mutate(pred_data, 
+                           pred = predict(.x, pred_data, 
+                                          re.form = ~0)))) %>% 
+  unnest(pr) %>% 
+  group_by(common, relig) %>%
   summarise(pred = mean(pred)) %>% 
-  filter(!(autonomy == 0 & autonomy_cntry == 1)) %>% 
-  mutate(effect = autonomy + autonomy_cntry)
+  mutate(effect = "Between-individual")
 
-pred_data %>%
-  ungroup() %>%
-  ggplot(aes(common, pred, color = factor(effect))) +
+predictions_wn <- pred_data %>%
+  mutate(pred = predict(mixed_3l[[1]], ., re.form = ~0)) %>% 
+  mutate(effect = "Within-individual")
+  
+predictions <- bind_rows(predictions_bw, predictions_wn) %>%
+  mutate(relig = factor(relig,
+                        labels = c("Non-religious",
+                                   "Religious")))
+predictions %>%
+#  mutate(effect = fct_rev(effect)) %>% 
+  ggplot(aes(common, pred, color = relig)) +
   geom_line(size = .7) +
-  scale_color_ptol(labels = expression(beta[2], beta[2] + beta[4], beta[2] + beta[4] + beta[6])) +
+  scale_color_ptol() +
   labs(x = "Common", y ="Moral", color = NULL) +
-  theme(legend.position = c(.7, .2))
+  theme(legend.position = c(.85, .2)) +
+  facet_wrap(~effect)
 
-#ggsave("pred-line.jpeg", width = 5, height = 4, dpi = 350)
-
-```
-
-## The development of the autonomy index over time
-
-```{r fig6, fig.width = 5, fig.height = 4, fig.cap="Figure 6.  The smoothed trend curve, with 95% confidence interval, for the development of the mean autonomy index across 68 countries that have participated in WVS/EVS at least three times."}
-
-autonomy_at_least3 <- autonomy_global %>% 
-  group_by(country) %>% 
-  filter(n() > 2)
-
-m <- gam(mean_autonomy ~ s(year, bs="cr") + s(country, bs = "re"), data = autonomy_at_least3, method="REML")
-
-newdata <- tibble(year = seq(min(autonomy_at_least3$year), max(autonomy_at_least3$year), 1),
-                  country = "Sweden")
-
-pred_data <- predict(m, newdata, se.fit = TRUE, exclude = "s(country)")
-
-
-newdata$pred <- pred_data$fit 
-newdata$se <- pred_data$se.fit 
-
-
-ggplot(newdata, aes(year, pred, ymin = pred - 2*se, ymax = pred + 2*se)) + 
-  geom_ribbon(alpha = .2) +
-  geom_line(color = "grey30", size = .8) +
-  labs(x = "Year", y = "Autonomy Index Mean")
-
-# ggsave("autonomy-trend.jpeg", width = 5, height = 4, dpi = 350)
+#ggsave("pred-line.jpeg", width = 7.5, height = 4, dpi = 350)
 
 
 ```
+
+
+
+### Country differences in religiosity partly explains country differences in the strength of the common-is-moral association
+
+```{r}
+
+cm_by_bhvr %>% 
+  distinct(cntry, relig_cntry) %>% 
+  summarise(mean(relig_cntry), sd(relig_cntry)) %>% 
+  kable(digits = 2)
+
+```
+
+```{r}
+
+est_alpha <- cm_by_bhvr %>%
+  ungroup() %>% 
+  select(cntry, behaviour, relig_cntry, cm) %>% 
+  pivot_wider(names_from = behaviour, values_from = cm) %>% 
+  select(-cntry, -relig_cntry) %>% 
+  psych::alpha() %>% 
+  .[["total"]] %>% 
+  pull(raw_alpha) %>% 
+  round(2)
+
+cm_by_relig_cntry = cm_by_bhvr %>% 
+  group_by(cntry, relig_cntry) %>% 
+  summarise(`Between-individual` = mean(cm)) %>% 
+  left_join(cntr_mean_within %>% rename(`Within-individual` = mean_r)) %>% 
+  gather("type", "cm", `Between-individual`, `Within-individual`)
+
+est_alpha
+cm_by_relig_cntry %>% 
+  group_by(type) %>% 
+  summarise(tidy(cor.test(relig_cntry, cm))) %>% 
+  select(type, estimate, conf.low, conf.high) %>% 
+  kable(digits = 2)
+
+```
+```{r fig8, fig.cap="Figure 8. Country differences in religiosity partly explain country differences in the strength of the common-is-moral association, whether measured within individuals (left) or between individuals, averaged across behaviors (right)."}
+
+cm_by_relig_cntry %>% 
+  mutate(type = fct_rev(type)) %>% 
+  ggplot(aes(relig_cntry, cm)) +
+  geom_point(alpha = .5) +
+  geom_smooth(method = "lm", color = "grey20") +
+  facet_wrap(~type) +
+  theme_classic() +
+  labs(x = "Religiosity", y = "Common-is-moral association")
+
+# ggsave("cntry-relig-effect.jpeg", width = 7.5, height = 4, dpi = 350)
+
+```
+
+
 
 
 
 
 ## Supplementary tables
 
-```{r stab1, cache = TRUE}
 
-evs_ind <- evs %>% 
-  select(id, cntry, A029, A039, A040, A042) %>% 
-  distinct()
+```{r stab1, eval=TRUE}
 
-model <- 'auton_latent  =~ A029 + A039 + A040 + A042'
+coef_map <- c(
+  "common_i" = "Co", 
+  "relig" = "Relig",
+  "common_i:relig" = "Co x Relig",
+  "female" = "Female",
+  "age" = "Age",
+  "edu_mid" = "Education: Secondary",
+  "edu_high" = "Education: Tertiary"
+)
 
-fit <- cfa(model = model, data = evs_ind, std.lv = TRUE, 
-           ordered = c("A029", "A039", "A040", "A042"))
+# Create df for random effects part
+rand_eff_rows <- mixed_3l  %>% 
+  map(~tidy(.x, effect = "ran_pars") %>%
+        mutate(term = paste0(term, group)) %>% 
+        select(term, estimate) %>% 
+        filter(!str_detect(term, "cor")) %>% 
+        mutate(term = str_replace_all(term,c(
+          "sd_+\\(Intercept\\)id:cntry" = "sigma(v1)",
+          "sd_+common_iid:cntry" = "sigma(v2)",
+          "sd_+\\(Intercept\\)cntry" = "sigma(u1)",
+          "sd_+common_icntry" = "sigma(u2)",
+          "sd_+ObservationResidual" = "sigma(e)"
+        )))) %>% 
+  bind_rows(.id = "m") %>% 
+    mutate(term = factor(term, levels = unique(term)),
+         estimate = sprintf("%.3f",  estimate)) %>% 
+  spread(m, estimate, fill =  " ")
 
-fit_mg <- cfa(model = model, data = evs_ind, std.lv = TRUE, 
-              group = "cntry",
-              ordered = c("A029", "A039", "A040", "A042"))
-fit_mg_inv <- cfa(model = model, data = evs_ind, std.lv = TRUE, 
-              group = "cntry",
-              ordered = c("A029", "A039", "A040", "A042"),
-              group.equal = c("loadings"))
 
-fit_mg_inv_str <- cfa(model = model, data = evs_ind, std.lv = TRUE, 
-              group = "cntry",
-              ordered = c("A029", "A039", "A040", "A042"),
-              group.equal = c("loadings","thresholds", "intercepts"))
+fit_rows <-  mixed_3l %>% 
+  map(~tibble(term = c("Nk", "Ni", "Nj"),
+              estimate = c(nobs(.x), ngrps(.x)))) %>% 
+  bind_rows(.id = "m") %>% 
+  mutate(term = factor(term, levels = unique(term)),
+         estimate = sprintf("%.0f",  estimate)) %>% 
+  spread(m, estimate)
 
-bind_rows(
-  c(fitmeasures(fit), model = "Model 1. Pooled sample"), 
-  c(fitmeasures(fit_mg), model = "Model 2. Configural invariance"), 
-  c(fitmeasures(fit_mg_inv), model = "Model 3. Metric invariance"),
-  c(fitmeasures(fit_mg_inv_str), model = "Model 4. Scalar invariance")
-) %>% 
-  dplyr::select(model, chisq, df, cfi, mfi, rmsea) %>% 
-  mutate_at(vars(-model), as.numeric) %>% 
-  mutate(cfi_change = cfi - lag(cfi),
-         mfi_change = mfi - lag(mfi),
-         rmsea_change = rmsea - lag(rmsea)) %>% 
-  kable(digits = c(0, 0, 0, 2, 2, 2, 3, 3, 3), 
-        col.names = c("Model", "Chisq", "DF", "CFI", "NCI", "RMSEA","𝚫CFI", "𝚫NCI", "𝚫RMSEA"),
-        caption = "Supplementary Table 1. Fit measures for measurement invariance tests.", 
-        notes = "Note: A baseline model in the pooled sample ignoring the group structure is followed by multiple-group CFA with no degree of restrictions, followed by restriction of factor loadings to be equal between countries, finally followed by additionally including the equality of items’ thresholds constraint. According to Lee and Smith’s (2020) guidelines for invariance of forced choice measurements, these results indicate both lack of metric invariance (𝚫CFI > 0.007) and lack of scalar invariance (𝚫CFI > 0.001 and 𝚫NCI > 0.004). Analyses used the lavaan package in R with diagonally weighted least squares to respect the forced choice nature.")
+rows <- bind_rows(rand_eff_rows, fit_rows)
+
+msummary(mixed_3l, 
+         statistic = "conf.int", 
+         statistic_vertical = FALSE,
+         effect = "fixed", 
+         coef_map = coef_map, 
+         gof_omit = "IC|Log|REML|sampling|pss|",
+         add_rows = rows,
+         escape = FALSE,
+         output = "kableExtra",
+         title = "Supplementary Table 1. Estimates and 95% confidence intervals from different specifications of the three-level models.") %>% 
+  kableExtra::kable_classic()
+
 
 ```
 
 
 
-```{r stab2}
+```{r stab2, eval=FALSE}
 
 cm_by_bhvr %>% 
   mutate(behaviour = factor(behaviour, levels = behavrs_labels$behaviour)) %>% 
-  select(Country = cntry, behaviour, Au_cnt = autonomy_cntry, cm) %>% 
+  select(Country = cntry, behaviour, cm) %>% 
   spread(behaviour, cm) %>% 
-  select(Country, state_benef:casual_sex, Au_cnt) %>% 
+  select(Country, state_benef:casual_sex) %>% 
   knitr::kable(digits = 2, caption = "Supplementary Table 2. Country estimates of the common-is-moral association for eight questionable behaviors, and the country-mean autonomy index.")
 
 
@@ -394,86 +489,68 @@ cm_by_bhvr %>%
 
 
 
-```{r stab3}
+```{r stab_mods, results="asis"}
 
 coef_map <- c(
-  "(Intercept)" = "Intercept",
   "common" = "Co", 
-  "autonomy" = "Au_ind",
-  "aut_short" = "Au_ind",
-  "common:autonomy" = "Co x Au_ind",
-  "common:aut_short" = "Co x Au_ind",
-  "autonomy_cntry" = "Au_cnt",
-  "aut_sh_cntry" = "Au_cnt",
-  "common:autonomy_cntry" = "Co x Au_cnt",
-  "common:aut_sh_cntry" = "Co x Au_cnt",
-  "hdi_edu" = "HDI, Education", 
-  "hdi_gni" = "HDI, Income",
-  "hdi_le" = "HDI, Health",
-  "common:hdi_edu" = "Co x HDI, Education", 
-  "common:hdi_gni" = "Co x HDI, Income",
-  "common:hdi_le" = "Co x HDI, Health",
-  "sexFemale" = "Female", 
+  "relig" = "Relig",
+  "common:relig" = "Co x Relig",
+  "female" = "Female",
   "age" = "Age",
-  "edumiddle" = "Education: Secondary", 
-  "eduhigh" = "Education: Tertiary",
-  "style" = "Style factor"
+  "edu_mid" = "Education: Secondary", 
+  "edu_high" = "Education: Tertiary"
 )
 
+order <- c(2, 1, 7, 8, 4, 6, 4, 5)
+
+for(i in order){
+mod_list <- list("M1. Baseline" = mixed_2l$mod[[i]], 
+                    "M2.1. logit(p_Mo>1)" = mixed_2l$mod_tob_1[[i]], 
+                    "M2.2. log(Mo)|Mo > 1" = mixed_2l$mod_tob_2[[i]])
+
+label <- behavrs_labels$label[i]
+title <- paste0('Supplementary Table 3. Estimates and 95% confidence intervals from different specifications of the mixed-effects models for "', label, '" behavior.')
 
 # Create df for random effects part
-rand_eff_rows <- mixed_models  %>% 
-  mutate(coef = map(reml, ~tidy(.x, effect = "ran_pars") %>%
-                      filter(str_detect(term, "sd")) %>% 
-                      select(-effect) %>% 
-                      unite(group, term, col = "term"))) %>% 
-  unnest(coef) %>% 
-  select(model, term, estimate) %>% 
-  mutate(term = str_replace_all(term,c(
-    "cntry:id_sd__\\(Intercept\\)" = "sigma(u1)",
-    "cntry:id_sd__common" = "sigma(u2)", 
-    "cntry_sd__\\(Intercept\\)" = "sigma(v1)",
-    "cntry_sd__common:autonomy" = "sigma(v4)",
-    "cntry_sd__common:aut_short" = "sigma(v4)",
-    "cntry_sd__common" = "sigma(v2)",
-    "cntry_sd__aut_short" = "sigma(v3)",
-    "cntry_sd__autonomy" = "sigma(v3)",
-    "Residual_sd__Observation" = "sigma(e)"
-  )),
-  term = factor(term, levels = unique(term)), 
-  estimate = sprintf("%.3f",  estimate)) %>% 
-  spread(model, estimate) %>% 
-  replace_na(list(m2.1 = "", m4 = ""))
+rand_eff_rows <- mod_list  %>% 
+  map(~tidy(.x, effect = "ran_pars") %>%
+        select(term, estimate) %>% 
+        filter(!str_detect(term, "cor")) %>% 
+        mutate(term = str_replace_all(term,c(
+          "sd_+\\(Intercept\\)(.cntry)?" = "sigma(u1)",
+          "sd_+common(.cntry)?" = "sigma(u2)",
+          "sd_+Observation(.Residual)?" = "sigma(e)"
+        )))) %>% 
+  bind_rows(.id = "m") %>% 
+    mutate(term = factor(term, levels = unique(term)),
+         estimate = sprintf("%.3f",  estimate)) %>% 
+  spread(m, estimate, fill =  " ")
 
-fit_rows <-  mixed_models  %>% 
-  mutate(fit = map(ml, ~tibble(term = c("Ni", "Nj", "Nk", "BIC"),
-                               estimate = c(nobs(.x), ngrps(.x), BIC(.x))))) %>% 
-  unnest(fit) %>% 
-  select(model, term, estimate) %>% 
-  mutate(term = factor(term, levels = unique(term)), 
+
+fit_rows <-  mod_list  %>% 
+  map(~tibble(term = c("Ni", "Nj"),
+              estimate = c(nobs(.x), ngrps(.x)))) %>% 
+  bind_rows(.id = "m") %>% 
+  mutate(term = factor(term, levels = unique(term)),
          estimate = sprintf("%.0f",  estimate)) %>% 
-  spread(model, estimate)
+  spread(m, estimate)
 
-rows <- tibble (term = "Random part", m1 = "", m2.1 = "", m2.2 = "", m3 = "", m4 = "") %>% 
-  bind_rows(rand_eff_rows) %>% 
-  bind_rows(fit_rows)
+rows <- bind_rows(rand_eff_rows, fit_rows)
 
-attr(rows, 'position') <- c(31:44)
-
-msummary(set_names(mixed_models$reml, mixed_models$name), 
-         statistic = "statistic", 
+tb <- msummary(mod_list, 
+         statistic = "conf.int", 
          statistic_vertical = FALSE,
          effect = "fixed", 
          coef_map = coef_map, 
-         gof_omit = "IC|Log|REML",
+         gof_omit = "IC|Log|REML|sampling|pss|",
          add_rows = rows,
-         escape = FALSE, 
-         title = "Supplementary Table 3. Results from different specifications of the mixed-effects model.",
-         notes = "Note: For simplicity the covariances of random effects are excluded from the table. BIC reported from full maximum likelihood estimations.")
+         escape = FALSE,
+         output = "kableExtra",
+         title = title) %>% 
+  kableExtra::kable_classic()
 
+cat(tb)
+}
 
 ```
-
-
-
 
